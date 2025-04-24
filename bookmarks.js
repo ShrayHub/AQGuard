@@ -1,5 +1,3 @@
-// bookmarks.js
-
 function getBookmarks() {
     return JSON.parse(localStorage.getItem('airQualityBookmarks')) || [];
 }
