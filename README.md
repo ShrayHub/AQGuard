@@ -38,6 +38,7 @@ Rising air pollution is a serious threat to both the environment and public heal
 📌 Folder Structure
 
 
+
 air-quality-dashboard/
 │
 ├── index.html / pba.html         # Main HTML file
@@ -48,7 +49,7 @@ air-quality-dashboard/
 ├── assets/
 │   └── icons, images, logos      # Visual assets
 └── README.md
-```
+
 
 
 🙌 Acknowledgements
