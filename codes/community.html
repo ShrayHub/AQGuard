@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Forum - Air Quality Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .zoom:hover {
+            transform: scale(1.02);
+            transition: transform 0.3s ease-in-out;
+        }
+        .post-card {
+            transition: all 0.3s ease;
+        }
+        .post-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .reply-form {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        .reply-form.active {
+            max-height: 300px;
+        }
+        .user-badge {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 9999px;
+        }
+        .reactions button:hover {
+            transform: scale(1.2);
+            transition: transform 0.2s ease;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #93c5fd;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #60a5fa;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-r from-blue-100 to-blue-200 min-h-screen">
+    <header class="flex justify-between items-center p-6 bg-blue-600 text-white shadow-lg">
+        <div class="text-4xl font-bold">Air Quality and Health Impact</div>
+        <nav>
+            <ul class="flex space-x-6 text-lg">
+                <li><a href="pba.html" class="hover:underline">Home</a></li>
+                <li><a href="pba.html#aqi" class="hover:underline">AQI Status</a></li>
+                <li><a href="bookmarks.html" class="hover:underline">Bookmarks</a></li>
+                <li><a href="community.html" class="hover:underline font-bold underline">Community</a></li>
+                <li><a href="pba.html#options" class="hover:underline">Options</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <div class="flex flex-col md:flex-row items-center">
+                <div class="md:w-2/3 mb-6 md:mb-0 md:pr-6">
+                    <h1 class="text-3xl font-bold text-blue-600 mb-3">Join Our Air Quality Community</h1>
+                    <p class="text-gray-700 mb-3">Share your experiences, ask questions, and connect with others who are concerned about air quality.</p>
+                    <p class="text-gray-700">Whether you're looking for advice on air purifiers, want to discuss pollution trends, or share local initiatives, this is the place!</p>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">#CleanAir</span>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">#AirPurifiers</span>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">#AirQualityAwareness</span>
+                        <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full">#PollutionFree</span>
+                    </div>
+                </div>
+                <div class="md:w-1/3">
+                    <div class="bg-blue-50 rounded-lg p-4 shadow-inner">
+                        <div class="flex items-center mb-3">
+                            <div class="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="ml-3">
+                                <div class="text-sm font-medium text-gray-900">Community Stats</div>
+                                <div class="text-sm text-gray-500">Growing every day</div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 text-center">
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600" id="post-count">0</div>
+                                <div class="text-sm text-gray-500">Posts</div>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-bold text-blue-600" id="user-count">0</div>
+                                <div class="text-sm text-gray-500">Members</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold text-blue-600 mb-4">Create a New Post</h2>
+            <form id="new-post-form">
+                <div class="mb-4">
+                    <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Your Name</label>
+                    <input type="text" id="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your name" required>
+                </div>
+                <div class="mb-4">
+                    <label for="post-title" class="block text-gray-700 text-sm font-bold mb-2">Post Title</label>
+                    <input type="text" id="post-title" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter a title for your post" required>
+                </div>
+                <div class="mb-4">
+                    <label for="post-location" class="block text-gray-700 text-sm font-bold mb-2">Location (Optional)</label>
+                    <input type="text" id="post-location" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your city or region">
+                </div>
+                <div class="mb-4">
+                    <label for="post-content" class="block text-gray-700 text-sm font-bold mb-2">Post Content</label>
+                    <textarea id="post-content" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Share your thoughts, questions, or experiences..." required></textarea>
+                </div>
+                <div class="mb-4">
+                    <label for="post-category" class="block text-gray-700 text-sm font-bold mb-2">Category</label>
+                    <select id="post-category" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="question">Question</option>
+                        <option value="discussion">Discussion</option>
+                        <option value="tip">Tip or Advice</option>
+                        <option value="news">News</option>
+                        <option value="local">Local Update</option>
+                    </select>
+                </div>
+                <div class="flex items-center justify-between">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">
+                        Post to Community
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-8">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div class="mb-4 md:mb-0">
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">Filter Posts</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="category-filter active bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-full text-sm transition duration-300" data-category="all">All</button>
+                        <button class="category-filter bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm transition duration-300" data-category="question">Questions</button>
+                        <button class="category-filter bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm transition duration-300" data-category="discussion">Discussions</button>
+                        <button class="category-filter bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm transition duration-300" data-category="tip">Tips & Advice</button>
+                        <button class="category-filter bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm transition duration-300" data-category="news">News</button>
+                        <button class="category-filter bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full text-sm transition duration-300" data-category="local">Local Updates</button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">Sort By</h3>
+                    <select id="sort-posts" class="shadow border rounded py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                        <option value="popular">Most Popular</option>
+                        <option value="active">Most Active</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="posts-container">
+            <div class="text-center text-gray-500 py-10" id="no-posts-message">
+                No posts yet. Be the first to share something with the community!
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-blue-600 text-white text-center p-4 mt-10 shadow-lg">
+        Contact Us: info@airqualityindia.com | Follow us on social media | Privacy Policy
+    </footer>
+
+    <button onclick="scrollToTop()" class="fixed bottom-5 right-5 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition duration-300">
+        ↑ Top
+    </button>
+
+    <script>
+        // Initialize data
+        let posts = [];
+        let users = new Set();
+        let currentFilter = 'all';
+        let currentSort = 'newest';
+
+        // Load data from localStorage
+        function loadData() {
+            const savedPosts = localStorage.getItem('airQualityCommunityPosts');
+            if (savedPosts) {
+                posts = JSON.parse(savedPosts);
+                
+                // Create a set of users
+                users = new Set();
+                posts.forEach(post => {
+                    users.add(post.username);
+                    post.replies.forEach(reply => {
+                        users.add(reply.username);
+                    });
+                });
+                
+                updateCounters();
+                displayPosts();
+            }
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('airQualityCommunityPosts', JSON.stringify(posts));
+            updateCounters();
+        }
+
+        // Update post and user counters
+        function updateCounters() {
+            document.getElementById('post-count').textContent = posts.length;
+            document.getElementById('user-count').textContent = users.size;
+        }
+
+        // Generate a random ID for posts and replies
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        // Format date for display
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' at ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        // Get relative time (e.g., "2 hours ago")
+        function getRelativeTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return diffInSeconds + ' seconds ago';
+            if (diffInSeconds < 3600) return Math.floor(diffInSeconds / 60) + ' minutes ago';
+            if (diffInSeconds < 86400) return Math.floor(diffInSeconds / 3600) + ' hours ago';
+            if (diffInSeconds < 604800) return Math.floor(diffInSeconds / 86400) + ' days ago';
+            return formatDate(dateString);
+        }
+
+        // Get category badge HTML
+        function getCategoryBadge(category) {
+            const categories = {
+                'question': {color: 'bg-purple-100 text-purple-800', icon: 'fa-question-circle', text: 'Question'},
+                'discussion': {color: 'bg-blue-100 text-blue-800', icon: 'fa-comments', text: 'Discussion'},
+                'tip': {color: 'bg-green-100 text-green-800', icon: 'fa-lightbulb', text: 'Tip'},
+                'news': {color: 'bg-yellow-100 text-yellow-800', icon: 'fa-newspaper', text: 'News'},
+                'local': {color: 'bg-red-100 text-red-800', icon: 'fa-map-marker-alt', text: 'Local Update'}
+            };
+            
+            const cat = categories[category] || categories['discussion'];
+            return `<span class="${cat.color} px-2 py-1 rounded-full text-xs flex items-center w-fit">
+                <i class="fas ${cat.icon} mr-1"></i> ${cat.text}
+            </span>`;
+        }
+
+        // Get user badge HTML based on username
+        function getUserBadge(username) {
+            // Hash the username to get a consistent color
+            let hash = 0;
+            for (let i = 0; i < username.length; i++) {
+                hash = username.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            // List of possible badge backgrounds
+            const badges = [
+                'bg-blue-100 text-blue-800',
+                'bg-green-100 text-green-800',
+                'bg-purple-100 text-purple-800',
+                'bg-yellow-100 text-yellow-800',
+                'bg-pink-100 text-pink-800',
+                'bg-indigo-100 text-indigo-800',
+                'bg-red-100 text-red-800',
+                'bg-teal-100 text-teal-800'
+            ];
+            
+            // Select a badge color based on username hash
+            const badgeColor = badges[Math.abs(hash) % badges.length];
+            
+            return `<span class="${badgeColor} user-badge">${username.charAt(0).toUpperCase()}</span>`;
+        }
+
+        // Display all posts with current filter and sort
+        function displayPosts() {
+            const container = document.getElementById('posts-container');
+            container.innerHTML = '';
+            
+            // Filter posts
+            let filteredPosts = posts;
+            if (currentFilter !== 'all') {
+                filteredPosts = posts.filter(post => post.category === currentFilter);
+            }
+            
+            // Sort posts
+            filteredPosts.sort((a, b) => {
+                switch (currentSort) {
+                    case 'newest':
+                        return new Date(b.timestamp) - new Date(a.timestamp);
+                    case 'oldest':
+                        return new Date(a.timestamp) - new Date(b.timestamp);
+                    case 'popular':
+                        return (b.likes - b.dislikes) - (a.likes - a.dislikes);
+                    case 'active':
+                        return b.replies.length - a.replies.length;
+                    default:
+                        return new Date(b.timestamp) - new Date(a.timestamp);
+                }
+            });
+            
+            // Show message if no posts
+            if (filteredPosts.length === 0) {
+                document.getElementById('no-posts-message').style.display = 'block';
+                return;
+            } else {
+                document.getElementById('no-posts-message').style.display = 'none';
+            }
+            
+            // Create HTML for each post
+            filteredPosts.forEach(post => {
+                const postElement = document.createElement('div');
+                postElement.className = 'bg-white rounded-lg shadow-lg p-6 mb-6 post-card';
+                postElement.id = `post-${post.id}`;
+                
+                // Create location badge if provided
+                let locationBadge = '';
+                if (post.location) {
+                    locationBadge = `
+                        <div class="text-sm text-gray-500 flex items-center ml-3">
+                            <i class="fas fa-map-marker-alt mr-1"></i> ${post.location}
+                        </div>
+                    `;
+                }
+                
+                // Create post HTML
+                postElement.innerHTML = `
+                    <div class="flex justify-between mb-3">
+                        <div class="flex items-center">
+                            <div class="bg-gray-300 text-gray-700 rounded-full h-10 w-10 flex items-center justify-center font-bold">
+                                ${post.username.charAt(0).toUpperCase()}
+                            </div>
+                            <div class="ml-2">
+                                <div class="font-semibold text-gray-900 flex items-center">
+                                    ${post.username} ${getUserBadge(post.username)}
+                                </div>
+                                <div class="text-xs text-gray-600">${getRelativeTime(post.timestamp)}</div>
+                            </div>
+                            ${locationBadge}
+                        </div>
+                        <div>
+                            ${getCategoryBadge(post.category)}
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">${post.title}</h3>
+                    <div class="mb-4 text-gray-700 whitespace-pre-line">${post.content}</div>
+                    <div class="flex items-center justify-between border-t border-b border-gray-200 py-3 mb-4">
+                        <div class="reactions flex items-center space-x-6">
+                            <button onclick="likePost('${post.id}')" class="flex items-center text-gray-500 hover:text-blue-500">
+                                <i class="fas fa-thumbs-up mr-1"></i> <span>${post.likes}</span>
+                            </button>
+                            <button onclick="dislikePost('${post.id}')" class="flex items-center text-gray-500 hover:text-red-500">
+                                <i class="fas fa-thumbs-down mr-1"></i> <span>${post.dislikes}</span>
+                            </button>
+                            <button onclick="toggleReplyForm('${post.id}')" class="flex items-center text-gray-500 hover:text-blue-500">
+                                <i class="fas fa-comment mr-1"></i> Reply
+                            </button>
+                        </div>
+                        <div class="text-sm text-gray-500">${post.replies.length} ${post.replies.length === 1 ? 'Reply' : 'Replies'}</div>
+                    </div>
+                    
+                    <div id="reply-form-${post.id}" class="reply-form mb-4">
+                        <form onsubmit="submitReply(event, '${post.id}')">
+                            <div class="mb-3">
+                                <label for="reply-username-${post.id}" class="block text-gray-700 text-sm font-bold mb-2">Your Name</label>
+                                <input type="text" id="reply-username-${post.id}" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Enter your name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="reply-content-${post.id}" class="block text-gray-700 text-sm font-bold mb-2">Your Reply</label>
+                                <textarea id="reply-content-${post.id}" rows="3" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Type your reply here..." required></textarea>
+                            </div>
+                            <div class="flex justify-between">
+                                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-4 rounded focus:outline-none focus:shadow-outline text-sm transition duration-300">
+                                    Post Reply
+                                </button>
+                                <button type="button" onclick="toggleReplyForm('${post.id}')" class="text-gray-500 hover:text-gray-700 font-bold py-1 px-4 rounded focus:outline-none focus:shadow-outline text-sm transition duration-300">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <div class="replies-container ${post.replies.length > 0 ? 'pt-2' : ''}">
+                        ${post.replies.length > 0 ? `<h4 class="text-lg font-bold mb-3">Replies</h4>` : ''}
+                        ${post.replies.map(reply => `
+                            <div class="bg-gray-50 rounded-lg p-4 mb-3" id="reply-${reply.id}">
+                                <div class="flex items-center mb-2">
+                                    <div class="bg-gray-300 text-gray-700 rounded-full h-8 w-8 flex items-center justify-center font-bold">
+                                        ${reply.username.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div class="ml-2">
+                                        <div class="text-md font-semibold text-gray-900 flex items-center">
+                                            ${reply.username} ${getUserBadge(reply.username)}
+                                        </div>
+                                        <div class="text-xs text-gray-600">${getRelativeTime(reply.timestamp)}</div>
+                                    </div>
+                                </div>
+                                <div class="text-gray-700 whitespace-pre-line">${reply.content}</div>
+                                <div class="flex items-center mt-2 text-sm">
+                                    <button onclick="likeReply('${post.id}', '${reply.id}')" class="flex items-center text-gray-500 hover:text-blue-500 mr-4">
+                                        <i class="fas fa-thumbs-up mr-1"></i> <span>${reply.likes}</span>
+                                    </button>
+                                    <button onclick="dislikeReply('${post.id}', '${reply.id}')" class="flex items-center text-gray-500 hover:text-red-500">
+                                        <i class="fas fa-thumbs-down mr-1"></i> <span>${reply.dislikes}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                container.appendChild(postElement);
+            });
+        }
+
+        // Create a new post
+        document.getElementById('new-post-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const title = document.getElementById('post-title').value.trim();
+            const location = document.getElementById('post-location').value.trim();
+            const content = document.getElementById('post-content').value.trim();
+            const category = document.getElementById('post-category').value;
+            
+            if (!username || !title || !content) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            const newPost = {
+                id: generateId(),
+                username: username,
+                title: title,
+                location: location,
+                content: content,
+                category: category,
+                timestamp: new Date().toISOString(),
+                likes: 0,
+                dislikes: 0,
+                replies: []
+            };
+            
+            posts.unshift(newPost);
+            users.add(username);
+            saveData();
+            displayPosts();
+            
+            // Reset form
+            document.getElementById('post-title').value = '';
+            document.getElementById('post-location').value = '';
+            document.getElementById('post-content').value = '';
+            
+            // Scroll to the new post
+            setTimeout(() => {
+                document.getElementById(`post-${newPost.id}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        });
+
+        // Toggle reply form
+        function toggleReplyForm(postId) {
+            const replyForm = document.getElementById(`reply-form-${postId}`);
+            replyForm.classList.toggle('active');
+            
+            // If opening the form, focus on the username field
+            if (replyForm.classList.contains('active')) {
+                // Try to pre-fill username if it exists in the post form
+                const mainUsername = document.getElementById('username').value;
+                if (mainUsername) {
+                    document.getElementById(`reply-username-${postId}`).value = mainUsername;
+                }
+                
+                setTimeout(() => {
+                    const usernameField = document.getElementById(`reply-username-${postId}`);
+                    if (usernameField.value.trim() === '') {
+                        usernameField.focus();
+                    } else {
+                        document.getElementById(`reply-content-${postId}`).focus();
+                    }
+                }, 300);
+            }
+        }
+
+        // Submit a reply
+        function submitReply(event, postId) {
+            event.preventDefault();
+            
+            const username = document.getElementById(`reply-username-${postId}`).value.trim();
+            const content = document.getElementById(`reply-content-${postId}`).value.trim();
+            
+            if (!username || !content) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const newReply = {
+                id: generateId(),
+                username: username,
+                content: content,
+                timestamp: new Date().toISOString(),
+                likes: 0,
+                dislikes: 0
+            };
+            
+            // Find the post and add the reply
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.replies.push(newReply);
+                users.add(username);
+                saveData();
+                displayPosts();
+                
+                // Close the reply form
+                toggleReplyForm(postId);
+                
+                // Scroll to the new reply
+                setTimeout(() => {
+                    document.getElementById(`reply-${newReply.id}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+        }
+
+        // Like a post
+        function likePost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.likes++;
+                saveData();
+                displayPosts();
+            }
+        }
+
+        // Dislike a post
+        function dislikePost(postId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.dislikes++;
+                saveData();
+                displayPosts();
+            }
+        }
+
+        // Like a reply
+        function likeReply(postId, replyId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                const reply = post.replies.find(r => r.id === replyId);
+                if (reply) {
+                    reply.likes++;
+                    saveData();
+                    displayPosts();
+                }
+            }
+        }
+
+        // Dislike a reply
+        function dislikeReply(postId, replyId) {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                const reply = post.replies.find(r => r.id === replyId);
+                if (reply) {
+                    reply.dislikes++;
+                    saveData();
+                    displayPosts();
+                }
+            }
+        }
+
+        // Handle category filter clicks
+        document.querySelectorAll('.category-filter').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all filter buttons
+                document.querySelectorAll('.category-filter').forEach(btn => {
+                    btn.classList.remove('active', 'bg-blue-500', 'text-white');
+                    btn.classList.add('bg-blue-100', 'hover:bg-blue-200', 'text-blue-800');
+                });
+
+                // Add active class to clicked button
+                this.classList.add('active', 'bg-blue-500', 'text-white');
+                this.classList.remove('bg-blue-100', 'hover:bg-blue-200', 'text-blue-800');
+
+                // Update current filter and display posts
+                currentFilter = this.getAttribute('data-category');
+                displayPosts();
+            });
+        });
+
+        // Handle sort selection
+        document.getElementById('sort-posts').addEventListener('change', function() {
+            currentSort = this.value;
+                displayPosts();
+             });
+
+        // Scroll to top function
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        // Initialize the community forum
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+
+            // Add sample data if no posts exist
+            if (posts.length === 0) {
+            // Add sample posts
+                const samplePosts = [
+                    {
+                        id: generateId(),
+                        username: "AirQualityExpert",
+                        title: "Does anyone recommend a good air purifier for a 500 sq. ft apartment?",
+                        location: "Delhi",
+                        content: "I've been experiencing allergies lately and want to invest in a good air purifier. My apartment is around 500 sq. ft. Any recommendations for brands or models that have worked well for you?",
+                        category: "question",
+                        timestamp: new Date(Date.now() - 86400000 * 2).toISOString(), // 2 days ago
+                        likes: 15,
+                        dislikes: 0,
+                        replies: [
+                            {
+                                id: generateId(),
+                                username: "CleanAirAdvocate",
+                                content: "I've been using the Blueair 211+ for about a year and it's been fantastic. It's ideal for spaces up to 540 sq. ft., so should work well for your apartment. The filter replacement is simple and it's quiet on the lower settings.",
+                                timestamp: new Date(Date.now() - 86400000 * 1.5).toISOString(),
+                                likes: 7,
+                                dislikes: 0
+                             },
+                            {
+                                id: generateId(),
+                                username: "HealthyHome",
+                                content: "If you're on a budget, the Coway AP-1512HH is excellent value. It covers about 360 sq. ft. but you could get away with it in a 500 sq. ft. apartment if you keep it in the room you use most. It's incredibly energy efficient too!",
+                                timestamp: new Date(Date.now() - 86400000 * 1).toISOString(),
+                                likes: 5,
+                                dislikes: 0
+                            }
+                                ]
+                            },
+                            {
+                                id: generateId(),
+                                username: "EnvironmentalScientist",
+                                title: "New Study Links Air Pollution to Cognitive Decline",
+                                location: "Mumbai",
+                                content: "A recent study published in the Environmental Health Journal found a significant correlation between long-term exposure to PM2.5 and accelerated cognitive decline in adults over 50.\n\nThe researchers followed 10,000 participants across urban areas for 8 years and found that those living in areas with higher pollution levels showed measurable cognitive impairment compared to the control group.\n\nThis adds to the growing body of evidence that air pollution affects not just our lungs, but our brains as well.",
+                                category: "news",
+                                timestamp: new Date(Date.now() - 86400000 * 3).toISOString(), // 3 days ago
+                                likes: 24,
+                                dislikes: 1,
+                                replies: [
+                                    {
+                                        id: generateId(),
+                                        username: "MedicalDoctor",
+                                        content: "Thank you for sharing this important research. As a healthcare professional, I'm increasingly concerned about the neurological impacts of air pollution. We're seeing more patients with cognitive issues in heavily polluted areas, and this kind of research helps establish the connection.",
+                                        timestamp: new Date(Date.now() - 86400000 * 2.5).toISOString(),
+                                        likes: 12,
+                                        dislikes: 0
+                                    }
+                                ]
+                            },
+                            {
+                                id: generateId(),
+                                username: "CleanAirActivist",
+                                title: "Local Clean Air Initiative Starting Next Month",
+                                location: "Bengaluru",
+                                content: "I'm excited to announce that we're launching a community-led clean air initiative in South Bengaluru starting next month. We'll be:\n\n1. Planting air-purifying plants in public spaces\n2. Conducting air quality workshops at local schools\n3. Lobbying local businesses to adopt cleaner practices\n\nWe're looking for volunteers! If interested, please reply to this post or email me at cleanair@example.com",
+                                category: "local",
+                                timestamp: new Date(Date.now() - 86400000 * 1).toISOString(), // 1 day ago
+                                likes: 36,
+                                dislikes: 0,
+                                replies: [
+                                    {
+                                        id: generateId(),
+                                        username: "GreenThumb",
+                                        content: "This sounds wonderful! I'd love to help with the plant selection and care. I'm a horticulturist specializing in urban environments and can suggest the most effective air-purifying plants for our local climate.",
+                                        timestamp: new Date(Date.now() - 86400000 * 0.5).toISOString(),
+                                        likes: 8,
+                                        dislikes: 0
+                                    },
+                                    {
+                                        id: generateId(),
+                                        username: "TeacherForChange",
+                                        content: "I'm a science teacher at DPS School and would love to have your team conduct a workshop for our middle school students. They're currently studying environmental science and this would be a perfect real-world connection.",
+                                        timestamp: new Date(Date.now() - 86400000 * 0.2).toISOString(),
+                                        likes: 10,
+                                        dislikes: 0
+                                    }
+                                ]
+                            }
+                        ];
+                        
+                        samplePosts.forEach(post => {
+                            posts.push(post);
+                            users.add(post.username);
+                            post.replies.forEach(reply => {
+                                users.add(reply.username);
+                            });
+                        });
+                        
+                        saveData();
+                        displayPosts();
+                    }
+                    });
+                        </script>
+                    </body>
+                    </html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Analysis</title>
+    <meta name="description" content="Monitor real-time air quality and pollution levels in your area. Get health recommendations and precautions based on air quality index.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>💨</text></svg>">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gradient-to-r from-blue-100 to-blue-200 dark:from-gray-900 dark:to-gray-800 dark:text-white min-h-screen flex flex-col">
+    <header class=" z-50 flex justify-between items-center p-6 bg-blue-600 text-white shadow-lg dark:bg-gray-900">
+        <div class="text-4xl font-bold flex items-center">
+            <i class="fas fa-wind mr-3"></i>
+            <span>Air Quality and Health Impact</span>
+        </div>
+        <nav class="flex items-center space-x-6">
+            <div class="md:block hidden">
+                <ul class="flex space-x-6 text-lg">
+                    <li><a href="pba.html" class="hover:underline">Home</a></li>
+                    <li><a href="#aqi" class="hover:underline">AQI Status</a></li>
+                    <li><a href="bookmarks.html" class="hover:underline">Bookmarks</a></li>
+                    <li><a href="community.html" class="hover:underline">Community</a></li>
+                    <li><a href="#options" class="hover:underline">Options</a></li>
+                </ul>
+            </div>
+            
+              <div class="flex items-center">
+                <span class="mr-2 hidden md:inline">🌙</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="ml-2 hidden md:inline">☀️</span>
+            </div>
+            
+            <button id="mobileMenuBtn" class="md:hidden text-2xl">
+                <i class="fas fa-bars"></i>
+            </button>
+        </nav>
+    </header>
+    
+    <div id="mobileMenu" class="hidden md:hidden bg-blue-700 dark:bg-gray-800 p-4 absolute top-20 right-0 left-0 z-40 shadow-lg">
+        <ul class="flex flex-col space-y-3 text-lg text-white">
+            <li><a href="pba.html" class="block py-2 px-4 hover:bg-blue-800 dark:hover:bg-gray-700 rounded">Home</a></li>
+            <li><a href="#aqi" class="block py-2 px-4 hover:bg-blue-800 dark:hover:bg-gray-700 rounded">AQI Status</a></li>
+            <li><a href="bookmarks.html" class="block py-2 px-4 hover:bg-blue-800 dark:hover:bg-gray-700 rounded">Bookmarks</a></li>
+            <li><a href="community.html" class="block py-2 px-4 hover:bg-blue-800 dark:hover:bg-gray-700 rounded">Community</a></li>
+            <li><a href="#options" class="block py-2 px-4 hover:bg-blue-800 dark:hover:bg-gray-700 rounded">Options</a></li>
+        </ul>
+    </div>
+
+    <div class="bg-blue-500 dark:bg-blue-900 text-white p-3 text-center">
+        <div id="user-location-aqi">
+            <span class="skeleton inline-block w-64 h-6 rounded"></span>
+        </div>
+    </div>
+
+    <!-- Main content container -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Quick location search -->
+        <div class="mb-8 bg-white p-6 rounded-lg shadow-lg dark:bg-gray-800">
+            <h3 class="text-xl font-bold mb-3"><i class="fas fa-search text-blue-600 mr-2 dark:text-blue-400"></i>Quick Location Search</h3>
+            <div class="flex flex-col md:flex-row gap-4">
+                <select id="quickSearch" class="p-2 border rounded flex-grow dark:bg-gray-700">
+                    <option value="">Select a location...</option>
+                    <option value="28.6139,77.2090">Delhi</option>
+                    <option value="19.0760,72.8777">Mumbai</option>
+                    <option value="12.9716,77.5946">Bangalore</option>
+                    <option value="22.5726,88.3639">Kolkata</option>
+                    <option value="17.3850,78.4867">Hyderabad</option>
+                    <option value="13.0827,80.2707">Chennai</option>
+                    <option value="26.9124,75.7873">Jaipur</option>
+                    <option value="23.0225,72.5714">Ahmedabad</option>
+                </select>
+                <button id="userLocationBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition duration-300 dark:bg-blue-800 dark:hover:bg-blue-700">
+                    <i class="fas fa-location-arrow mr-1"></i> Use My Location
+                </button>
+                <button id="quickSearchBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition duration-300 dark:bg-green-800 dark:hover:bg-green-700">
+                    <i class="fas fa-search mr-1"></i> Search
+                </button>
+            </div>
+        </div>
+
+        <!-- Map section -->
+        <div id="map" class="w-full h-96 rounded-lg shadow-lg border"></div>
+        <div class="bg-white p-6 rounded-lg shadow-lg mt-6 dark:bg-gray-800 dark:text-white">
+            <h3 class="text-2xl font-bold mb-3">Air Quality Details</h3>
+            <div id="info" class="text-lg text-gray-700 dark:text-gray-300">Click on the map or use the quick search to view air quality information</div>
+        </div>
+        
+        <!-- Bookmark feature -->
+        <div id="bookmark-section" class="mt-4 hidden">
+            <button id="bookmarkLocation" class="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600 transition duration-300">
+                <i class="far fa-bookmark mr-1"></i> Bookmark This Location
+            </button>
+        </div>
+
+        <!-- Pollution Heatmap -->
+        <div class="relative mt-10 mb-16 text-center" id="heatmap">
+            <h2 class="text-3xl font-bold mb-3 text-blue-600 dark:text-blue-400">Pollution Heatmap</h2>
+            <div id="pollution-heatmap" class="w-full h-96 rounded-lg shadow-lg border overflow-hidden"></div>
+            <div class="bg-white p-6 rounded-lg shadow-lg mt-6 mb-20 dark:bg-gray-800 dark:text-white">
+                <h3 class="text-2xl font-bold mb-3">Pollution Details</h3>
+                <div id="pollution-info" class="text-lg text-gray-700 dark:text-gray-300">Click on the map to view pollution information</div>
+            </div>
+        </div>
+        <div style="height: 100px;"></div>
+
+        <!-- Infographic cards --> 
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-9 mt-24 mb-10">
+            <div class="bg-white p-6 rounded-lg shadow-lg zoom cursor-pointer dark:bg-gray-800 dark:text-white group hover:shadow-xl" onclick="window.location.href='reasons.html'">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold mb-3">
+                        <i class="fas fa-smog text-blue-600 mr-2 dark:text-blue-400 group-hover:text-red-500 dark:group-hover:text-red-400 transition-colors"></i>Causes of Worsening Air Quality</h3>
+                    <span class="text-gray-400 group-hover:text-blue-500 transition-colors">
+                        <i class="fas fa-chevron-right"></i></span>
+                </div>
+                <p>Industrial emissions, vehicular pollution, construction dust, and burning of fossil fuels contribute significantly to poor air quality.</p>
+                <div class="mt-3 text-blue-600 dark:text-blue-400 hidden group-hover:block">Learn more →</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg zoom cursor-pointer dark:bg-gray-800 dark:text-white group hover:shadow-xl" onclick="window.location.href='pets.html'">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold mb-3">
+                        <i class="fas fa-paw text-green-600 mr-2 dark:text-green-400 group-hover:text-purple-500 dark:group-hover:text-purple-400 transition-colors"></i>Protect Your Pets from Poor Air Quality</h3>
+                    <span class="text-gray-400 group-hover:text-blue-500 transition-colors">
+                        <i class="fas fa-chevron-right"></i></span>
+                </div>
+                <p>Keep pets indoors, use air purifiers, provide fresh water, and avoid outdoor walks during high pollution hours.</p>
+                <div class="mt-3 text-blue-600 dark:text-blue-400 hidden group-hover:block">Learn more →</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg zoom cursor-pointer dark:bg-gray-800 dark:text-white group hover:shadow-xl" onclick="window.location.href='improve.html'">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold mb-3"><i class="fas fa-tree text-emerald-600 mr-2 dark:text-emerald-400 group-hover:text-green-500 dark:group-hover:text-green-400 transition-colors"></i>Ways to Improve Air Quality</h3>
+                    <span class="text-gray-400 group-hover:text-blue-500 transition-colors"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <p>Plant trees, reduce vehicle usage, promote renewable energy, and use eco-friendly products.</p>
+                <div class="mt-3 text-blue-600 dark:text-blue-400 hidden group-hover:block">Learn more →</div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow-lg zoom cursor-pointer dark:bg-gray-800 dark:text-white group hover:shadow-xl" onclick="window.location.href='precautions.html'">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold mb-3"><i class="fas fa-user-shield text-purple-600 mr-2 dark:text-purple-400 group-hover:text-orange-500 dark:group-hover:text-orange-400 transition-colors"></i>Precautions for Children and Elderly</h3>
+                    <span class="text-gray-400 group-hover:text-blue-500 transition-colors"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <p>Limit outdoor exposure, use air purifiers, wear masks, and consult doctors if symptoms appear.</p>
+                <div class="mt-3 text-blue-600 dark:text-blue-400 hidden group-hover:block">Learn more →</div>
+            </div>
+        </div>
+
+        <!-- Charts section! -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- AQI Trend (Last 7 Days) -->
+            <div class="bg-white p-6 rounded-lg shadow-lg dark:bg-gray-800 dark:text-white">
+                <h3 class="text-2xl font-bold mb-3">AQI Trend (Last 7 Days)</h3>
+                <canvas id="aqiTrendChart" height="220"></canvas>
+            </div>
+        
+            <!-- Pollutant Comparison -->
+            <div class="bg-white p-6 rounded-lg shadow-lg dark:bg-gray-800 dark:text-white">
+                <h3 class="text-2xl font-bold mb-3">Pollutant Comparison</h3>
+                <canvas id="pollutantChart" height="220"></canvas>
+            </div>
+        </div>
+
+        <!-- Health Impact Section -->
+        <div class="mt-10 bg-white p-6 rounded-lg shadow-lg dark:bg-gray-800 dark:text-white" id="symptom">
+            <h2 class="text-3xl font-bold mb-3 text-center text-blue-600 dark:text-blue-400">Health Impact Assessment</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-xl font-bold mb-3"><i class="fas fa-lungs text-red-500 mr-2"></i>Symptom Checker</h3>
+                    <textarea id="symptoms" class="w-full p-3 border rounded-lg mt-3 dark:bg-gray-700 dark:text-white dark:border-gray-600" placeholder="Describe your symptoms..." rows="1"></textarea>
+                    <button onclick="analyzeSymptoms()" class="bg-blue-600 text-white px-6 py-2 rounded-lg mt-3 hover:bg-blue-700 transition duration-300 dark:bg-blue-800 dark:hover:bg-blue-700">
+                        <i class="fas fa-stethoscope mr-1"></i> Analyze
+                    </button>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold mb-3"><i class="fas fa-heartbeat text-red-500 mr-2"></i>Health Assessment Results</h3>
+                    <div id="symptomResult" class="mt-2 p-4 bg-gray-100 dark:bg-gray-600 rounded-lg min-h-[180px] text-left">
+                        Enter your symptoms to receive an air quality related health assessment.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Health tips based on AQI -->
+            <div class="mt-6">
+                <h3 class="text-xl font-bold mb-3"><i class="fas fa-shield-alt text-green-500 mr-2"></i>Health Tips Based on Air Quality</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+                    <div class="bg-green-100 dark:bg-green-900 p-4 rounded-lg">
+                        <h4 class="font-bold text-green-800 dark:text-green-300"><i class="fas fa-check-circle mr-1"></i> For Good AQI (0-50)</h4>
+                        <ul class="list-disc list-inside text-sm mt-2 text-green-700 dark:text-green-400">
+                            <li>Enjoy outdoor activities</li>
+                            <li>Open windows for fresh air</li>
+                            <li>Perfect time for outdoor exercise</li>
+                        </ul>
+                    </div>
+                    <div class="bg-yellow-100 dark:bg-yellow-900 p-4 rounded-lg">
+                        <h4 class="font-bold text-yellow-800 dark:text-yellow-300"><i class="fas fa-exclamation-circle mr-1"></i> For Moderate AQI (51-100)</h4>
+                        <ul class="list-disc list-inside text-sm mt-2 text-yellow-700 dark:text-yellow-400">
+                            <li>Consider reducing prolonged outdoor exertion</li>
+                            <li>Keep windows closed during peak pollution hours</li>
+                            <li>Stay hydrated</li>
+                        </ul>
+                    </div>
+                    <div class="bg-red-100 dark:bg-red-900 p-4 rounded-lg">
+                        <h4 class="font-bold text-red-800 dark:text-red-300"><i class="fas fa-radiation mr-1"></i> For Unhealthy AQI (101+)</h4>
+                        <ul class="list-disc list-inside text-sm mt-2 text-red-700 dark:text-red-400">
+                            <li>Avoid outdoor activities</li>
+                            <li>Use air purifiers indoors</li>
+                            <li>Wear N95 masks if going outside</li>
+                            <li>Consult doctor if experiencing symptoms</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Newsletter signup -->
+        <div class="mt-10 bg-white p-6 rounded-lg shadow-lg dark:bg-gray-800 dark:text-white">
+            <h3 class="text-2xl font-bold mb-3 text-center">Stay Updated with Air Quality Alerts</h3>
+            <p class="text-center mb-4">Subscribe to our newsletter to receive air quality alerts and health tips for your region.</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center">
+                <input type="email" placeholder="Your email address" class="p-3 border rounded-lg w-full md:w-1/2 dark:bg-gray-700">
+                <button id="subscribeBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition duration-300 dark:bg-green-800 dark:hover:bg-green-700">
+                    Subscribe Now
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="bg-blue-600 text-white p-8 mt-10 shadow-lg dark:bg-gray-900" id="options">
+        <div class="container mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h4 class="text-xl font-bold mb-4">About Us</h4>
+                    <p>We provide real-time air quality monitoring and health recommendations to help you stay safe from air pollution.</p>
+                    <div class="mt-4 flex space-x-4">
+                        <a href="#" class="text-2xl hover:text-blue-300 transition"><i class="fab fa-facebook"></i></a>
+                        <a href="#" class="text-2xl hover:text-blue-300 transition"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="text-2xl hover:text-blue-300 transition"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-2xl hover:text-blue-300 transition"><i class="fab fa-linkedin"></i></a>
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-xl font-bold mb-4">Quick Links</h4>
+                    <ul class="space-y-2">
+                        <li><a href="#" class="hover:underline">About Air Quality Index</a></li>
+                        <li><a href="#" class="hover:underline">Health Impact</a></li>
+                        <li><a href="#" class="hover:underline">Policy Recommendations</a></li>
+                        <li><a href="#" class="hover:underline">Research Publications</a></li>
+                        <li><a href="#" class="hover:underline">FAQs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-xl font-bold mb-4">Contact Us</h4>
+                    <ul class="space-y-2">
+                        <li><i class="fas fa-envelope mr-2"></i> shravyavermav@gmail.com</li>
+                        <li><i class="fas fa-phone mr-2"></i> +91 123 456 7890</li>
+                        <li><i class="fas fa-map-marker-alt mr-2"></i> 123 Green Park, New Delhi, India</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-blue-500 dark:border-gray-700 mt-8 pt-6 text-center">
+                <p>© 2025 Air Quality India. All rights reserved. <a href="#" class="underline ml-2">Privacy Policy</a> | <a href="#" class="underline">Terms of Service</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast notification container -->
+    <div id="toast" class="toast"></div>
+    
+    
+    <!-- Script imports -->
+    <script src="scripts.js"></script>
+
+    <!-- Chatbase integration -->
+    <script>
+        (function () {
+            if (!window.chatbase || window.chatbase("getState") !== "initialized") {
+                window.chatbase = (...arguments) => {
+                    if (!window.chatbase.q) {
+                        window.chatbase.q = [];
+                    }
+                    window.chatbase.q.push(arguments);
+                };
+            
+                window.chatbase = new Proxy(window.chatbase, {
+                    get(target, prop) {
+                        if (prop === "q") {
+                            return target.q;
+                        }
+                        return (...args) => target(prop, ...args);
+                    },
+                });
+            }
+            
+            const onLoad = function () {
+                const script = document.createElement("script");
+                script.src = "https://www.chatbase.co/embed.min.js";
+                script.id = "hwF42SiaVGEbBLRNFKD7A";
+                script.domain = "www.chatbase.co";
+                script.defer = true;
+                document.body.appendChild(script);
+            };
+            
+            if (document.readyState === "complete") {
+                onLoad();
+            } else {
+                window.addEventListener("load", onLoad);
+            }
+        })();
+    </script>
+</body>
+</html>
