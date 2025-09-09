@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookmarked Locations - Air Quality Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet" />
+    <style>
+        .zoom:hover {
+            transform: scale(1.05);
+            transition: transform 0.3s ease-in-out;
+        }
+        .bookmark-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-r from-blue-100 to-blue-200">
+    <header class="flex justify-between items-center p-6 bg-blue-600 text-white shadow-lg">
+        <div class="text-4xl font-bold">Air Quality and Health Impact</div>
+        <nav>
+            <ul class="flex space-x-6 text-lg">
+                <li><a href="pba.html" class="hover:underline">Home</a></li>
+                <li><a href="pba.html#aqi" class="hover:underline">AQI Status</a></li>
+                <li><a href="bookmarks.html" class="hover:underline font-bold underline">Bookmarks</a></li>
+                <li><a href="community.html" class="hover:underline">Communtiy</a></li>
+                <li><a href="pba.html#options" class="hover:underline">Options</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <div class="container mx-auto p-6">
+        <div class="mb-10 text-center">
+            <h2 class="text-3xl font-bold mb-3 text-blue-600">Your Bookmarked Locations</h2>
+            <p class="text-lg mb-6">Save and monitor air quality at locations important to you</p>
+            
+            <div id="map" class="w-full h-96 rounded-lg shadow-lg border mb-6"></div>
+            
+            <div class="flex flex-col space-y-2 md:space-y-0 md:flex-row md:space-x-2 mb-6">
+                <div class="flex-grow">
+                    <input type="text" id="locationName" class="w-full p-3 border rounded-lg" placeholder="Location name (e.g., Home, Office)" />
+                </div>
+                <div class="flex-grow">
+                    <button onclick="addCurrentLocation()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-300 w-full">Add Current Location</button>
+                </div>
+                <div class="flex-grow">
+                    <button onclick="clearAllBookmarks()" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition duration-300 w-full">Clear All Bookmarks</button>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow-lg mb-6">
+                <h3 class="text-2xl font-bold mb-3">Add a New Bookmark</h3>
+                <p class="mb-4">Click on the map to select a location, then click "Add Current Location" to bookmark it</p>
+                <div id="selected-location-info" class="text-lg text-gray-700 mt-2">No location selected</div>
+            </div>
+        </div>
+
+        <div id="bookmarks-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center text-gray-500 py-10">
+                No bookmarks yet. Click on the map to select a location.
+            </div>
+        </div>
+    </div>
+    
+    <footer class="bg-blue-600 text-white text-center p-4 mt-10 shadow-lg">
+        Contact Us: info@airqualityindia.com | Follow us on social media | Privacy Policy
+    </footer>
+
+    <button onclick="scrollToTop()" class="fixed bottom-5 right-5 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition duration-300">
+        ↑ Top
+    </button>
+
+    <script>
+        let currentLat = null;
+        let currentLng = null;
+        let currentRegion = null;
+        let currentAQI = null;
+        let currentPollutionData = null;
+        let bookmarkedLocations = [];
+        let markers = [];
+        
+        // Initialize map
+        var map = L.map('map').setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        // Load bookmarks from localStorage
+        function loadBookmarks() {
+            const savedBookmarks = localStorage.getItem('airQualityBookmarks');
+            if (savedBookmarks) {
+                bookmarkedLocations = JSON.parse(savedBookmarks);
+                displayBookmarks();
+            }
+        }
+        
+        // Save bookmarks to localStorage
+        function saveBookmarks() {
+            localStorage.setItem('airQualityBookmarks', JSON.stringify(bookmarkedLocations));
+        }
+        
+       
+        function displayBookmarks() {
+            const container = document.getElementById('bookmarks-container');
+            
+            // Clear previous bookmarks
+            container.innerHTML = '';
+            
+            // Clear previous markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            if (bookmarkedLocations.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center text-gray-500 py-10">
+                        No bookmarks yet. Click on the map to select a location.
+                    </div>
+                `;
+                return;
+            }
+            
+            // Display each bookmark
+            bookmarkedLocations.forEach((bookmark, index) => {
+                const aqiCondition = getAQICondition(bookmark.aqi);
+                const color = getHeatMapColor(bookmark.aqi);
+                
+                // Create bookmark card
+                const bookmarkCard = document.createElement('div');
+                bookmarkCard.className = 'bg-white p-6 rounded-lg shadow-lg bookmark-card';
+                bookmarkCard.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="text-xl font-bold">${bookmark.name}</h3>
+                        <button onclick="removeBookmark(${index})" class="text-red-600 hover:text-red-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-3">${bookmark.region}</p>
+                    <div class="border-t border-b py-2 my-2">
+                        <p class="flex justify-between">
+                            <span>AQI:</span> 
+                            <span style="color:${color}; font-weight:bold;">${bookmark.aqi} (${aqiCondition.label})</span>
+                        </p>
+                    </div>
+                    <div class="mt-3">
+                        <p><strong>Precautions:</strong></p>
+                        <p class="text-sm text-gray-700">${aqiCondition.precautions}</p>
+                    </div>
+                    <button onclick="refreshBookmark(${index})" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300 text-sm w-full">
+                        Refresh Data
+                    </button>
+                `;
+                
+                container.appendChild(bookmarkCard);
+                
+                // Add marker for this bookmark
+                const marker = L.marker([bookmark.lat, bookmark.lng]).addTo(map);
+                marker.bindPopup(`<b>${bookmark.name}</b><br>${bookmark.region}<br>AQI: ${bookmark.aqi}`);
+                markers.push(marker);
+            });
+        }
+        
+        // Add current location as bookmark
+        function addCurrentLocation() {
+            if (!currentLat || !currentLng) {
+                alert('Please select a location on the map first');
+                return;
+            }
+            
+            const locationName = document.getElementById('locationName').value.trim() || 'Unnamed Location';
+            
+            const newBookmark = {
+                name: locationName,
+                lat: currentLat,
+                lng: currentLng,
+                region: currentRegion,
+                aqi: currentAQI,
+                pollutionData: currentPollutionData,
+                timestamp: new Date().toISOString()
+            };
+            
+            bookmarkedLocations.push(newBookmark);
+            saveBookmarks();
+            displayBookmarks();
+            
+            // Reset form
+            document.getElementById('locationName').value = '';
+            document.getElementById('selected-location-info').innerHTML = 'Location added to bookmarks!';
+            
+            // Reset current selection
+            currentLat = null;
+            currentLng = null;
+            currentRegion = null;
+            currentAQI = null;
+            currentPollutionData = null;
+            
+            setTimeout(() => {
+                document.getElementById('selected-location-info').innerHTML = 'No location selected';
+            }, 3000);
+        }
+        
+        // Remove a bookmark
+        function removeBookmark(index) {
+            if (confirm('Are you sure you want to remove this bookmark?')) {
+                bookmarkedLocations.splice(index, 1);
+                saveBookmarks();
+                displayBookmarks();
+            }
+        }
+        
+        // Refresh a bookmark's data
+        async function refreshBookmark(index) {
+            const bookmark = bookmarkedLocations[index];
+            
+            try {
+                let response = await fetch(`https://api.waqi.info/feed/geo:${bookmark.lat};${bookmark.lng}/?token=15b277589f55c0e4341672c345de7cd7c1677d5d`);
+                let data = await response.json();
+                
+                if (data.status === "ok") {
+                    bookmark.aqi = data.data.aqi;
+                    
+                    // Update pollution data
+                    bookmark.pollutionData = {};
+                    if (data.data.iaqi) {
+                        Object.keys(data.data.iaqi).forEach(key => {
+                            bookmark.pollutionData[key] = data.data.iaqi[key].v;
+                        });
+                    }
+                    
+                    bookmark.timestamp = new Date().toISOString();
+                    saveBookmarks();
+                    displayBookmarks();
+                } else {
+                    alert('Failed to refresh data for this location');
+                }
+            } catch (error) {
+                alert('Error refreshing data: ' + error.message);
+            }
+        }
+        
+        // Clear all bookmarks
+        function clearAllBookmarks() {
+            if (confirm('Are you sure you want to clear all bookmarks? This cannot be undone.')) {
+                bookmarkedLocations = [];
+                saveBookmarks();
+                displayBookmarks();
+            }
+        }
+        
+        // Handle map click
+        map.on('click', async function(e) {
+            var lat = e.latlng.lat;
+            var lng = e.latlng.lng;
+            
+            // Store current selection
+            currentLat = lat;
+            currentLng = lng;
+            
+            try {
+                // Reverse geocode to get location name
+                let response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                let locationData = await response.json();
+                let region = locationData.display_name;
+                currentRegion = region;
+                
+                document.getElementById('selected-location-info').innerHTML = `<p class='text-center'>Selected: ${region}</p><p class='text-center'>Fetching air quality data...</p>`;
+                
+                // Fetch AQI data
+                let aqiResponse = await fetch(`https://api.waqi.info/feed/geo:${lat};${lng}/?token=15b277589f55c0e4341672c345de7cd7c1677d5d`);
+                let aqiData = await aqiResponse.json();
+                
+                if (aqiData.status === "ok") {
+                    let aqi = aqiData.data.aqi;
+                    let condition = getAQICondition(aqi);
+                    currentAQI = aqi;
+                    
+                    // Store pollution data
+                    currentPollutionData = {};
+                    if (aqiData.data.iaqi) {
+                        Object.keys(aqiData.data.iaqi).forEach(key => {
+                            currentPollutionData[key] = aqiData.data.iaqi[key].v;
+                        });
+                    }
+                    
+                    document.getElementById('selected-location-info').innerHTML = `
+                        <p><strong>Selected:</strong> ${region}</p>
+                        <p><strong>AQI:</strong> ${aqi} (${condition.label})</p>
+                        <p><strong>Enter a name and click "Add Current Location" to bookmark</strong></p>
+                    `;
+                    
+                    // Suggest a location name based on the address
+                    let suggestedName = '';
+                    if (locationData.address) {
+                        if (locationData.address.city) suggestedName = locationData.address.city;
+                        else if (locationData.address.town) suggestedName = locationData.address.town;
+                        else if (locationData.address.village) suggestedName = locationData.address.village;
+                        else if (locationData.address.suburb) suggestedName = locationData.address.suburb;
+                    }
+                    
+                    if (suggestedName) {
+                        document.getElementById('locationName').value = suggestedName;
+                    }
+                } else {
+                    document.getElementById('selected-location-info').innerHTML = `<p class='text-red-600'>No data available for this location.</p>`;
+                }
+            } catch (error) {
+                document.getElementById('selected-location-info').innerHTML = `<p class='text-red-600'>Failed to fetch data. ${error.message}</p>`;
+            }
+        });
+        
+        // Helper function to get AQI condition - copied from main page
+        function getAQICondition(aqi) {
+            if (aqi <= 50) return { label: "Good", diseases: "None", precautions: "No precautions needed" };
+            if (aqi <= 100) return { label: "Moderate", diseases: "Minor irritations", precautions: "Stay hydrated, limit outdoor activities" };
+            if (aqi <= 200) return { label: "Unhealthy for Sensitive Groups", diseases: "Allergies, Asthma", precautions: "Use air purifiers, avoid prolonged outdoor exposure" };
+            if (aqi <= 300) return { label: "Unhealthy", diseases: "Breathing Issues, Coughing", precautions: "Wear masks, avoid outdoor activities" };
+            if (aqi <= 400) return { label: "Very Unhealthy", diseases: "Asthma, Bronchitis", precautions: "Stay indoors, use air purifiers" };
+            return { label: "Hazardous", diseases: "Severe respiratory issues", precautions: "Stay indoors, wear masks, seek medical help" };
+        }
+        
+        // Helper function to get heatmap color - copied from main page
+        function getHeatMapColor(aqi) {
+            if (aqi <= 50) return "#00e400"; // Good - Green
+            if (aqi <= 100) return "#ffff00"; // Moderate - Yellow
+            if (aqi <= 200) return "#ff7e00"; // Unhealthy for Sensitive Groups - Orange
+            if (aqi <= 300) return "#ff0000"; // Unhealthy - Red
+            if (aqi <= 400) return "#8f3f97"; // Very Unhealthy - Purple
+            return "#7e0023"; // Hazardous - Maroon
+        }
+        
+        // Scroll to top function
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+        
+        // Load bookmarks when page loads
+        window.onload = function() {
+            loadBookmarks();
+        };
+    </script>
+</body>
+</html>
